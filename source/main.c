@@ -9,6 +9,8 @@
  *		When i use the term "Right" or "Left", 
  *		i also mean "Top" and "Bottom" respectively.
  *
+ *		You need to start the game in order to enable 2 players, once the ball is moving, pressing the 2nd menu button sets the AI off and enables player 2 control
+ *
  *		Demo link:
  *
  *	I acknowledge all content contained herein, excluding template or example
@@ -30,6 +32,7 @@ enum Display_SM{Run1, Run2, Run3};
 enum Ball_SM{Reset, Go, GameOver};
 enum Menu_SM{WaitB, PressB, ReleaseB};
 enum AI_SM{WaitBall,MoveRight,MoveLeft};
+enum SCORE_SM{NoGoal,Goal};
 
 //Func Decs
 int Move_Tick(int state);
@@ -38,6 +41,7 @@ int Ball_Tick(int state);
 int Display_Tick(int state);
 int Menu_Tick(int state);
 int Game_Tick(int state);
+int Score_Tick(int state);
 
 //Global Vars//
 //Buttons
@@ -51,6 +55,11 @@ char mode = 0x00;
 char modeBool = false;
 bool ballMovedR = false;
 bool ballMovedL = false;
+bool p1Score = 0x00;
+bool p2Score = 0x00;
+bool p1Win = false;
+bool p2Win = false;
+bool modeP2 = false;
 
 
 //Output Pattern
@@ -79,11 +88,11 @@ int main(void) {
 	DDRD = 0xFF; PORTD = 0x00; // D as LED ouput 
 	DDRC = 0xFF; PORTC = 0x00; // C as LED output
 	DDRA = 0x00; PORTA = 0xFF; // A as user input
-	DDRB = 0x00; PORTB = 0xFF; // B as button input
+	DDRB = 0xF0; PORTB = 0x0F; // B as button input
 	
-	task MOVE_Task, MENU_Task, GAME_Task, BALL_Task, DIS_Task, AI_Task;
-	task tasks[] = {MOVE_Task, MENU_Task, GAME_Task, BALL_Task, DIS_Task, AI_Task};
-	const char numTasks = 6;
+	task MOVE_Task, SCORE_Task, MENU_Task, GAME_Task, BALL_Task, DIS_Task, AI_Task;
+	task tasks[] = {MOVE_Task, SCORE_Task, MENU_Task, GAME_Task, BALL_Task, DIS_Task, AI_Task};
+	const char numTasks = 7;
 	int period = 5;
 
 	MOVE_Task.state = 0;
@@ -95,6 +104,11 @@ int main(void) {
         AI_Task.period = 100;
         AI_Task.elapsedTime = AI_Task.period;
         AI_Task.TickFct = &AI_Tick;
+
+	SCORE_Task.state = 0;
+        SCORE_Task.period = 100;
+        SCORE_Task.elapsedTime = SCORE_Task.period;
+        SCORE_Task.TickFct = &Score_Tick;
 
 	GAME_Task.state = 1;
         GAME_Task.period = 20;
@@ -135,14 +149,51 @@ while (1) {
     return 1;
 }
 
+int Score_Tick(int state){
+	switch(state){
+		case NoGoal:
+			if(p1Score || p2Score){
+				state = Goal;
+			}
+			else {
+				state = NoGoal;
+			}
+			break;
+		case Goal:
+			if(p2Score && !(PINB&0x10)){
+				p2Score = false;
+				PORTB = PORTB | 0x10;
+				
+			}
+			else if(p2Score && !(PINB&0x20)){
+				p2Score = false;
+                                PORTB = PORTB |	0x30;
+				p2Win = true;
+			}
+			else if(p1Score && !(PINB&0x80)){
+				p1Score = false;
+                                PORTB = PORTB | 0x80;
+		
+			}
+			else if(p1Score && !(PINB&0x40)){
+				p1Score = false;
+                                PORTB = PORTB | 0xC0;
+				p1Win = true;
+			}
+			break;
+
+	}
+	return state;
+}
+
 int AI_Tick(int state){
 	switch(state){
 		case WaitBall:
-			if(ballMovedR&&(wall_P!=0x07)){
+			if(ballMovedR&&(wall_P!=0x07)&&!(modeP2)){
 				ballMovedR = false;
 				state = MoveRight;
 			}
-			else if(ballMovedL&&!(wall_P&0x80)){
+			else if(ballMovedL&&!(wall_P&0x80)&&!(modeP2)){
 				ballMovedL = false;
 				state = MoveLeft;
 			}
@@ -242,11 +293,13 @@ int Game_Tick(int state){
 		case G1:	//AI Game
 			wall_P = 0x1C;
 			modeBool = false;
+			modeP2 = false;		//Enables AI
 			state = Idle;
 			break;
-		case G2 :	//Player 2 eventually, wall for now
-			wall_P = 0xFF;
+		case G2 :	//Player 2 control
+			wall_P = 0x1C;
                         modeBool = false;
+			modeP2 = true;		//Disables AI
                         state = Idle;
 			break;
 	}
@@ -261,7 +314,12 @@ int Ball_Tick(int state){
 			ball_R = 0xFB;
 			wall_P = 0x1C;
 			
-			if(bPress){//Initialize past pos 
+			if(p1Win||p2Win){
+				PORTB = PORTB & 0x0F;
+                                p2Win = false;
+                                p1Win = false;
+			}
+			else if(bPress){//Initialize past pos 
 				tmpP_p = ball_P;
 				tmpP_r = ball_R;
 				state = Go;
@@ -331,7 +389,7 @@ int Ball_Tick(int state){
 					else if(tmpC_r==paddle_R){		//Collision Game Over
 						ball_R =0x00;
 						state=GameOver;
-
+						p2Score = true;
 					}
 					else{
 						tmpP_r = ball_R;
@@ -404,7 +462,7 @@ int Ball_Tick(int state){
 					else if(tmpC_r==paddle_R){         //Collision Game Over
                                                 ball_R =0x00;
                                                 state=GameOver;
-
+						p2Score = true;
                                         }
 					else if(tmpC_p &  0x80){	
 			//	ball_P=0xFF;		
@@ -503,7 +561,7 @@ int Ball_Tick(int state){
                                         	
 					       	ball_R =0x00;
                                                 state=GameOver;
-
+						p2Score = true;
                                         }
 				/*	else if((tmpC_p&0x80)&&(tmpF_r == paddle_R)){ //Odd case where its at top wall corner, goes to POS R:0xFE P:0x40
 						
@@ -524,6 +582,7 @@ int Ball_Tick(int state){
 							ball_P =0x40;	
 						       	ball_R =0x00;
                                        			state=GameOver;
+							p2Score = true;
 							}
 						else{				// Else bounce on
 							
@@ -609,6 +668,7 @@ int Ball_Tick(int state){
                                       else if(tmpC_r == wall_R){ //Will be NPC GameOver
 						ball_R =0x00;
                                                 state=GameOver;
+						p1Score=true;
                                         }
                                         else{		//Else go left straight
 						
@@ -691,6 +751,7 @@ int Ball_Tick(int state){
 					else if(tmpC_r == wall_R){
 						ball_R =0x00;
                                                 state=GameOver;
+						p1Score=true;
 					}
 					else if(tmpC_p&0x80){
 
@@ -788,13 +849,14 @@ int Ball_Tick(int state){
                                         else if(tmpC_r==wall_R){                             
  	                                        ball_R =0x00;
                                                 state=GameOver;
-
+						p1Score=true;
                                         }
                                 	else if((tmpC_p& 0x80)&&(tmpF_r == wall_R)){ 				//check corner case
 						if(tmpF_r ==wall_R){       // Case were its about to hit right side with no paddle
                                                         ball_P =0x40;
                                                         ball_R =0x00;
                                                         state=GameOver;
+							p1Score = true;
                                                 }
                                                 else{                           // Else bounce on
                                                 
