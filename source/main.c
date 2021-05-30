@@ -138,19 +138,25 @@ while (1) {
 int AI_Tick(int state){
 	switch(state){
 		case WaitBall:
-			if(ballMovedR){
+			if(ballMovedR&&(wall_P!=0x07)){
 				ballMovedR = false;
 				state = MoveRight;
 			}
-			else if(ballMovedL){
+			else if(ballMovedL&&!(wall_P&0x80)){
 				ballMovedL = false;
 				state = MoveLeft;
 			}
 			else{state = WaitBall;}
 			break;
 		case MoveRight:
-			state = WaitBall;
-			wall_P >>=1;
+			if(wall_P&0x80){
+				state = WaitBall;
+				wall_P = 0x70;
+			}
+			else{
+				state = WaitBall;
+				wall_P >>=1;
+			}
 			break;
 		case MoveLeft:
 			state = WaitBall;
