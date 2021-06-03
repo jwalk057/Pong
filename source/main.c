@@ -18,6 +18,8 @@
  */
 #include <avr/io.h>
 #include <stdbool.h>
+#include <time.h>
+#include <stdlib.h>
 #include "timer.h"
 #include "scheduler.h"
 #ifdef _SIMULATE_
@@ -25,14 +27,15 @@
 #endif
 
 
-//Enum States
+//Enum SMs
 enum SwapGame_SM{Idle, G1, G2};
 enum Move_SM{Wait, Press, Release};
 enum Display_SM{Run1, Run2, Run3};
 enum Ball_SM{Reset, Go, GameOver};
 enum Menu_SM{WaitB, PressB, ReleaseB};
 enum AI_SM{WaitBall,MoveRight,MoveLeft};
-enum SCORE_SM{NoGoal,Goal};
+enum Score_SM{NoGoal,Goal};
+enum SpeedUp_Sm{Regular, Fast};
 
 //Func Decs
 int Move_Tick(int state);
@@ -42,9 +45,10 @@ int Display_Tick(int state);
 int Menu_Tick(int state);
 int Game_Tick(int state);
 int Score_Tick(int state);
+int SpeedUp_Tick(int state);
 
 //Global Vars//
-//Buttons
+//Buttons and Bools
 char b1 =0x00;
 char b2 =0x00;
 bool bPress = false;
@@ -60,6 +64,8 @@ bool p2Score = 0x00;
 bool p1Win = false;
 bool p2Win = false;
 bool modeP2 = false;
+int Speed = 350;
+bool isFast = false;
 
 
 //Output Pattern
@@ -90,9 +96,9 @@ int main(void) {
 	DDRA = 0x00; PORTA = 0xFF; // A as user input
 	DDRB = 0xF0; PORTB = 0x0F; // B as button input
 	
-	task MOVE_Task, SCORE_Task, MENU_Task, GAME_Task, BALL_Task, DIS_Task, AI_Task;
-	task tasks[] = {MOVE_Task, SCORE_Task, MENU_Task, GAME_Task, BALL_Task, DIS_Task, AI_Task};
-	const char numTasks = 7;
+	task MOVE_Task, SCORE_Task, SPEED_Task, MENU_Task, GAME_Task, BALL_Task, DIS_Task, AI_Task;
+	task tasks[] = {MOVE_Task, SCORE_Task, MENU_Task, GAME_Task, SPEED_Task, BALL_Task, DIS_Task, AI_Task};
+	const char numTasks = 8;
 	int period = 5;
 
 	MOVE_Task.state = 0;
@@ -101,9 +107,14 @@ int main(void) {
 	MOVE_Task.TickFct = &Move_Tick;
 
 	AI_Task.state = 0;
-        AI_Task.period = 100;
+        AI_Task.period = 50;
         AI_Task.elapsedTime = AI_Task.period;
         AI_Task.TickFct = &AI_Tick;
+
+	SPEED_Task.state = 0;
+        SPEED_Task.period = 50;
+        SPEED_Task.elapsedTime = SPEED_Task.period;
+        SPEED_Task.TickFct = &SpeedUp_Tick;
 
 	SCORE_Task.state = 0;
         SCORE_Task.period = 100;
@@ -116,7 +127,7 @@ int main(void) {
         GAME_Task.TickFct = &Game_Tick;
 
 	BALL_Task.state = 0;
-        BALL_Task.period =300;
+        BALL_Task.period = 300;	// Will use for loop for speed, 300 ms for regular, 200 for fast
         BALL_Task.elapsedTime = BALL_Task.period;
         BALL_Task.TickFct = &Ball_Tick;
 
@@ -134,12 +145,15 @@ int main(void) {
 	TimerSet(period);
 	TimerOn();
 	int i = 0x00;
+
+	srand(time(NULL)); //Initialize srand
+
     /* Insert your solution below */
 while (1) {
 	for(i = 0; i < numTasks;i++){
 		if(tasks[i].elapsedTime == tasks[i].period){
-			tasks[i].state = tasks[i].TickFct(tasks[i].state);
-			tasks[i].elapsedTime = 0;
+				tasks[i].state = tasks[i].TickFct(tasks[i].state);
+				tasks[i].elapsedTime = 0;
 		}
 		tasks[i].elapsedTime += period;
 	}
@@ -147,6 +161,26 @@ while (1) {
 	TimerFlag = 0;
     }
     return 1;
+}
+
+int SpeedUp_Tick(int state){
+	switch(state){
+		case Regular:
+			if(isFast){
+				Speed = 100;
+				state = Fast;
+			}
+			else {state = Regular;}
+			break;
+		case Fast:
+			if(!isFast){
+				Speed = 350;
+				state = Regular;
+			}
+			else {state = Fast;}
+			break;
+	}
+	return state;
 }
 
 int Score_Tick(int state){
@@ -187,6 +221,7 @@ int Score_Tick(int state){
 }
 
 int AI_Tick(int state){
+	int brain = rand() % 20;
 	switch(state){
 		case WaitBall:
 			if(ballMovedR&&(wall_P!=0x07)&&!(modeP2)){
@@ -201,17 +236,26 @@ int AI_Tick(int state){
 			break;
 		case MoveRight:
 			if(wall_P&0x80){
-				state = WaitBall;
-				wall_P = 0x70;
+				if((brain % 4) == 1){state = WaitBall;}
+				else{
+					state = WaitBall;
+					wall_P = 0x70;
+				}
 			}
 			else{
-				state = WaitBall;
-				wall_P >>=1;
+				if((brain % 4)==1){state = WaitBall;}
+				else{
+					state = WaitBall;
+					wall_P >>=1;
+				}
 			}
 			break;
 		case MoveLeft:
-			state = WaitBall;
-                        wall_P <<=1;
+			if((brain % 4)==1){state = WaitBall;}
+			else{
+				state = WaitBall;
+                        	wall_P <<=1;
+			}
 			break;
 	}
 	return state;
@@ -436,6 +480,7 @@ int Ball_Tick(int state){
                                                         ball_P >>= 1;
 							ballMovedR=true;
                                                         state=Go;
+							if(isFast){isFast = false;}
 							
                                                 }
                         //Mid Paddle
@@ -446,16 +491,17 @@ int Ball_Tick(int state){
 							ball_P =ball_P <<1;
 							ballMovedL = true;
                                                         state = Go;
+							if(isFast){isFast = false;}
                                                 }
                         //Right Paddle
-                                                else{
+                                                else{	
                                                         tmpP_r = ball_R;
                                                         tmpP_p = ball_P;
                                                         ball_R = ball_R << 1 | 0x01;
                                                        	ball_P <<=1;
 							ballMovedL = true;
                                                         state=Go;
-							
+							if(!isFast){isFast = true;}
                                                 }
 					
 					}
@@ -464,15 +510,6 @@ int Ball_Tick(int state){
                                                 state=GameOver;
 						p2Score = true;
                                         }
-					else if(tmpC_p &  0x80){	
-			//	ball_P=0xFF;		
-						/*tmpP_p = ball_P;
-                                                tmpP_r = ball_R ;
-                                                ball_P<<=1;
-                                                ball_R>>=1;
-                                                state=Go;
-						*/
-					}
 					else{	
 						tmpP_r = ball_R;
                                                 tmpP_p = ball_P;
@@ -502,12 +539,6 @@ int Ball_Tick(int state){
 						tmpF_p = 0x40;
 						tmpF_r = 0xFE;
 					}
-					/*else if(tmpC_p &0x80){
-						tmpC_p=0x80;
-						tmpC_r=ball_R;
-						tmpF_p=0x40;
-						tmpF_r = tmpF_r>>1;
-					}*/
 					else{
 						tmpF_p >>=1;
 						tmpF_r = tmpF_r>>1;
@@ -563,20 +594,6 @@ int Ball_Tick(int state){
                                                 state=GameOver;
 						p2Score = true;
                                         }
-				/*	else if((tmpC_p&0x80)&&(tmpF_r == paddle_R)){ //Odd case where its at top wall corner, goes to POS R:0xFE P:0x40
-						
-						 tmpF_p = 0x40;
-						 tmpF_r = 0xFE;
-						if(tmpF_r == paddle_R&&!(paddle_P & 0xC0)){	
-								//Game over
-			
-                                       				ball_P =0x40;
-								ball_R = 0x00;
-								state = GameOver;	
-								
-							}
-					}
-						*/
 					else if(tmpC_p &0x80){		//Top wall right edge
 						if(tmpF_r ==paddle_R){	// Case were its about to hit right side with no paddle
 							ball_P =0x40;	
