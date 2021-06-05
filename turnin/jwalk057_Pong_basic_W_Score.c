@@ -1,7 +1,7 @@
 /*	Author: lab
  *  Partner(s) Name: Jeremy Walker
  *	Lab Section:
- *	Assignment: Lab #11  Exercise #
+ *	Assignment: Lab #11  Exercise # 1
  *	Exercise Description: [optional - include for your own benefit]
  *		
  *		When i use the term "Right" or "Left", 
