@@ -1,7 +1,7 @@
 /*	Author: lab
  *  Partner(s) Name: Jeremy Walker
  *	Lab Section:
- *	Assignment: Lab #11  Exercise #
+ *	Assignment: Lab #11  Exercise # 2
  *	Exercise Description: [optional - include for your own benefit]
  *		
  *		NOTE: The code provided and .h files worked, but columns 2 and 3 on my keypad seemed to be swapped, so for example i put that when key 2 is pressed, output to B is 3. This is because when i press key 3, the .h thinks its key 2 due to GetBit() function. As i used the .h file provided i cannot change it, so i changed my code in main instead. 
