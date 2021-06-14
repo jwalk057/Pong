@@ -3,4 +3,4 @@
 
 Youtube Video of project demonstration:
 
-This project was coded and wired by myself, i used a virtual machine running a distro of Ubuntu Linux that had AVR toolchain installed. I coded in C from the command prompt using vim text editor and used GitHub to keep track of my files. 
+This embedded systems project was coded and wired by myself, i used a virtual machine running a distro of Ubuntu Linux that had AVR toolchain installed to easily write to my microcontroller. I coded in C from the command prompt using vim text editor and used GitHub to keep track of my files. I used an ATMEGA 1284p microcontroller, basic tactile buttons, LEDs, LED matrix, and a joystick for this project. I used multiple synchronous state machines all handled by a task scheduler for the physics of the ball, the control of the paddles, reset function, and writing out to the LED matrix.
