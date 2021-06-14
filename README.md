@@ -1,4 +1,4 @@
-#Pong
+# Pong
 *This repo was created from my original project due to an issue with a corrupted commit. The original projecty has all commits made from the beginning of the project to the final version here https://github.com/jwalk057/Project-Pong.git*
 Youtube Video of project demonstration:
 
